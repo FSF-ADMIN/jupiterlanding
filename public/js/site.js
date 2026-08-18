@@ -33,3 +33,11 @@ fetch('/api/me', { credentials: 'same-origin' })
     if (wl) { wl.textContent = 'Hi, ' + user.name.split(' ')[0]; wl.removeAttribute('href'); wl.style.cursor = 'default'; }
   })
   .catch(() => {});
+
+// Scale the fixed 950x594 dashboard canvas to fill the laptop screen exactly
+const dashScr = document.querySelector('.laptop-screen');
+const dashEl = dashScr && dashScr.querySelector('.dash');
+function fitDash() {
+  if (dashEl) dashEl.style.transform = 'scale(' + (dashScr.clientWidth / 950) + ')';
+}
+if (dashEl) { fitDash(); window.addEventListener('resize', fitDash); }
