@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Jupiter</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="assets/mark.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a href="index.html" class="brand"><img src="assets/mark.png" alt="Jupiter logo"><span>jupiter</span></a>
+    <div class="nav-right">
+      <span class="nav-login" style="cursor:default">Admin Panel</span>
+      <button class="btn btn-ghost btn-sm" id="logout-btn" style="display:none">Log out</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Login view -->
+<div class="wrap" id="login-view">
+  <div class="form-card login-card">
+    <h3>Admin login</h3>
+    <p class="fc-sub">Enter the admin password to manage users and analytics.</p>
+    <div class="form-err" id="login-err"></div>
+    <form id="login-form">
+      <div class="field">
+        <label for="pw">Password</label>
+        <input class="inp" id="pw" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%">Log in →</button>
+    </form>
+  </div>
+</div>
+
+<!-- Dashboard view -->
+<div class="adm-wrap" id="dash-view" style="display:none">
+  <div class="adm-head">
+    <div>
+      <h1>Mission control</h1>
+      <div class="sub">Users, signups, and site analytics — <span id="updated-at"></span></div>
+    </div>
+    <div class="adm-tools">
+      <a class="btn btn-ghost btn-sm" href="/api/admin/export.csv">⬇ Export CSV</a>
+      <button class="btn btn-primary btn-sm" id="refresh-btn">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="adm-stats">
+    <div class="adm-stat"><div class="lbl">Total signups</div><div class="val" id="st-total">—</div><div class="sub" id="st-total-sub"></div></div>
+    <div class="adm-stat"><div class="lbl">Today</div><div class="val" id="st-today">—</div><div class="sub">new signups</div></div>
+    <div class="adm-stat"><div class="lbl">This week</div><div class="val" id="st-week">—</div><div class="sub">last 7 days</div></div>
+    <div class="adm-stat"><div class="lbl">Page views</div><div class="val" id="st-views">—</div><div class="sub">all pages, all time</div></div>
+  </div>
+
+  <div class="adm-panel">
+    <h3>
+      <span>Users <span id="user-count" style="color:var(--dim);font-weight:500;font-size:13px"></span></span>
+      <span class="adm-tools">
+        <input class="inp" id="search" type="search" placeholder="Search name, email, company…">
+        <select class="inp" id="plan-filter" style="width:150px">
+          <option value="">All plans</option>
+          <option value="starter">Starter</option>
+          <option value="growth">Growth</option>
+          <option value="enterprise">Enterprise</option>
+          <option value="none">No plan</option>
+        </select>
+      </span>
+    </h3>
+    <div class="tbl-scroll">
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Team</th><th>Plan</th><th>Signed up</th><th></th></tr></thead>
+        <tbody id="user-rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="users-empty" style="display:none">No users yet — signups will appear here the moment they land.</div>
+  </div>
+
+  <div class="adm-panel">
+    <h3><span>Traffic by page</span></h3>
+    <div id="visit-rows"></div>
+    <div class="empty" id="visits-empty" style="display:none">No page views tracked yet.</div>
+  </div>
+</div>
+
+<script>
+let USERS = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { credentials: 'same-origin', ...opts });
+  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  return res;
+}
+
+function showLogin() {
+  $('login-view').style.display = 'block';
+  $('dash-view').style.display = 'none';
+  $('logout-btn').style.display = 'none';
+}
+function showDash() {
+  $('login-view').style.display = 'none';
+  $('dash-view').style.display = 'block';
+  $('logout-btn').style.display = 'inline-flex';
+}
+
+function planChip(plan) {
+  const p = (plan || '').toLowerCase();
+  if (['starter','growth','enterprise'].includes(p))
+    return `<span class="chip ${p}">${p[0].toUpperCase() + p.slice(1)}</span>`;
+  return '<span class="chip none">—</span>';
+}
+
+function renderUsers() {
+  const q = $('search').value.trim().toLowerCase();
+  const pf = $('plan-filter').value;
+  const rows = USERS.filter(u => {
+    const hay = `${u.name} ${u.email} ${u.company}`.toLowerCase();
+    if (q && !hay.includes(q)) return false;
+    if (pf === 'none') return !u.plan;
+    if (pf && (u.plan || '').toLowerCase() !== pf) return false;
+    return true;
+  });
+  $('user-count').textContent = `(${rows.length}${rows.length !== USERS.length ? ' of ' + USERS.length : ''})`;
+  $('user-rows').innerHTML = rows.map(u => `
+    <tr>
+      <td class="em">${esc(u.name)}</td>
+      <td><a href="mailto:${esc(u.email)}" style="color:var(--violet-2)">${esc(u.email)}</a></td>
+      <td>${esc(u.company) || '—'}</td>
+      <td>${esc(u.teamSize) || '—'}</td>
+      <td>${planChip(u.plan)}</td>
+      <td style="white-space:nowrap">${new Date(u.createdAt).toLocaleString([], {dateStyle:'medium', timeStyle:'short'})}</td>
+      <td><button class="del-btn" data-id="${esc(u.id)}">Delete</button></td>
+    </tr>`).join('');
+  $('users-empty').style.display = USERS.length ? 'none' : 'block';
+}
+
+function renderVisits(visits) {
+  const entries = Object.entries(visits).sort((a, b) => b[1] - a[1]);
+  const max = entries.length ? entries[0][1] : 1;
+  $('visit-rows').innerHTML = entries.map(([pg, n]) => `
+    <div class="visit-row">
+      <span class="pg">${esc(pg)}</span>
+      <span class="visit-bar"><i style="width:${Math.max(4, Math.round(n / max * 100))}%"></i></span>
+      <span class="n">${n.toLocaleString()}</span>
+    </div>`).join('');
+  $('visits-empty').style.display = entries.length ? 'none' : 'block';
+}
+
+async function loadData() {
+  const res = await api('/api/admin/data');
+  const data = await res.json();
+  USERS = data.users.slice().reverse();
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const weekAgo = Date.now() - 7 * 864e5;
+  $('st-total').textContent = USERS.length.toLocaleString();
+  const last = USERS[0];
+  $('st-total-sub').textContent = last ? 'latest: ' + last.name : 'no signups yet';
+  $('st-today').textContent = USERS.filter(u => u.createdAt >= dayStart).length.toLocaleString();
+  $('st-week').textContent = USERS.filter(u => u.createdAt >= weekAgo).length.toLocaleString();
+  $('st-views').textContent = Object.values(data.visits).reduce((a, b) => a + b, 0).toLocaleString();
+  $('updated-at').textContent = 'updated ' + now.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  renderUsers();
+  renderVisits(data.visits);
+  showDash();
+}
+
+$('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('login-err').style.display = 'none';
+  const pw = $('pw').value;
+  if (!pw) { $('login-err').textContent = 'Enter the password first.'; $('login-err').style.display = 'block'; return; }
+  const res = await fetch('/api/admin/login', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw })
+  });
+  if (res.ok) { $('pw').value = ''; loadData(); }
+  else { $('login-err').textContent = 'Wrong password. Try again.'; $('login-err').style.display = 'block'; }
+});
+
+$('logout-btn').addEventListener('click', async () => {
+  await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
+  showLogin();
+});
+$('refresh-btn').addEventListener('click', () => loadData().catch(() => {}));
+$('search').addEventListener('input', renderUsers);
+$('plan-filter').addEventListener('change', renderUsers);
+$('user-rows').addEventListener('click', async e => {
+  const btn = e.target.closest('.del-btn');
+  if (!btn) return;
+  const u = USERS.find(x => x.id === btn.dataset.id);
+  if (!confirm(`Delete ${u ? u.name : 'this user'}? This can't be undone.`)) return;
+  await api('/api/admin/users/' + btn.dataset.id, { method: 'DELETE' });
+  loadData().catch(() => {});
+});
+
+loadData().catch(() => showLogin());
+</script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up — Jupiter</title>
+<meta name="description" content="Create your Jupiter account and start building your AI workforce.">
+<link rel="icon" type="image/png" href="assets/mark.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a href="index.html" class="brand"><img src="assets/mark.png" alt="Jupiter logo"><span>jupiter</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="how.html">How it Works</a>
+      <a href="integrations.html">Integrations</a>
+      <a href="security.html">Security</a>
+      <a href="pricing.html">Pricing</a>
+    </div>
+    <div class="nav-right">
+      <a href="waitlist.html" class="nav-login">Waitlist</a>
+      <a href="signup.html" class="btn btn-primary btn-sm">Sign Up →</a>
+    </div>
+  </div>
+</nav>
+
+<header class="page-head">
+  <div class="glow-top"></div>
+  <div class="wrap">
+    <div class="badge"><span class="dot"></span> Early access</div>
+    <h2>Create your <span class="grad-text">Jupiter account.</span></h2>
+    <p class="section-sub">Tell us about your team and we'll set up your AI workforce. No credit card required.</p>
+  </div>
+</header>
+
+<section style="padding-top:0;padding-bottom:110px">
+  <div class="wrap">
+    <div class="form-card reveal">
+      <form id="signup-form" novalidate>
+        <h3>Sign up</h3>
+        <p class="fc-sub">Get access to the Jupiter platform and deploy your first AI employees.</p>
+        <div class="form-err" id="form-err"></div>
+        <div class="form-grid2">
+          <div class="field">
+            <label for="f-name">Full name</label>
+            <input class="inp" id="f-name" name="name" type="text" placeholder="Alex Rivera" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="f-company">Company</label>
+            <input class="inp" id="f-company" name="company" type="text" placeholder="Acme Co." autocomplete="organization">
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-email">Work email</label>
+          <input class="inp" id="f-email" name="email" type="email" placeholder="alex@acme.com" autocomplete="email" required>
+        </div>
+        <div class="form-grid2">
+          <div class="field">
+            <label for="f-size">Team size</label>
+            <select class="inp" id="f-size" name="teamSize">
+              <option value="">Select…</option>
+              <option>1–10</option>
+              <option>11–50</option>
+              <option>51–200</option>
+              <option>201–1,000</option>
+              <option>1,000+</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-plan">Plan interest</label>
+            <select class="inp" id="f-plan" name="plan">
+              <option value="">Not sure yet</option>
+              <option value="starter">Starter — $15k</option>
+              <option value="growth">Growth — $50k + $5k/mo</option>
+              <option value="enterprise">Enterprise — $90k+</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px" id="submit-btn">Create account →</button>
+        <p class="form-note">Not ready yet? <a href="waitlist.html">Join the waitlist</a> instead.</p>
+      </form>
+
+      <div class="success-box" id="success-box">
+        <div class="s-ico">✓</div>
+        <h3>You're in.</h3>
+        <p id="success-msg">Thanks for signing up — our team will reach out within one business day to get your AI workforce set up.</p>
+        <a href="index.html" class="btn btn-ghost" style="margin-top:24px">Back to home</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-bottom" style="border:none;padding-top:0">
+      <span>© 2026 Jupiter. All rights reserved.</span>
+      <div class="foot-cols" style="gap:26px">
+        <a href="index.html" style="font-size:13.5px;color:var(--dim)">Home</a>
+        <a href="pricing.html" style="font-size:13.5px;color:var(--dim)">Pricing</a>
+        <a href="waitlist.html" style="font-size:13.5px;color:var(--dim)">Waitlist</a>
+        <a href="mailto:hello@jupiterterminal.com" style="font-size:13.5px;color:var(--dim)">Contact</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/site.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get('plan')) document.getElementById('f-plan').value = params.get('plan');
+
+  const form = document.getElementById('signup-form');
+  const errBox = document.getElementById('form-err');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errBox.style.display = 'none';
+    const data = {
+      name: document.getElementById('f-name').value.trim(),
+      email: document.getElementById('f-email').value.trim(),
+      company: document.getElementById('f-company').value.trim(),
+      teamSize: document.getElementById('f-size').value,
+      plan: document.getElementById('f-plan').value
+    };
+    if (!data.name || !data.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email)) {
+      errBox.textContent = !data.name ? 'Enter your name first.' : 'Enter a valid email address.';
+      errBox.style.display = 'block';
+      return;
+    }
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    try {
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out.error || 'Something went wrong.');
+      form.style.display = 'none';
+      if (out.existing) document.getElementById('success-msg').textContent = "You're already signed up with that email — we've updated your details.";
+      document.getElementById('success-box').style.display = 'block';
+    } catch (err) {
+      errBox.textContent = err.message + ' Try again.';
+      errBox.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Create account →';
+    }
+  });
+</script>
+</body>
+</html>
