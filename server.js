@@ -153,7 +153,7 @@ const server = http.createServer(async (req, res) => {
       }
       const state = crypto.randomBytes(16).toString('hex');
       oauthStates.set(state, Date.now() + 10 * 60 * 1000);
-      const origin = `http://${req.headers.host}`;
+      const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
       const auth = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
         redirect_uri: origin + '/auth/google/callback',
@@ -175,7 +175,7 @@ const server = http.createServer(async (req, res) => {
         return res.end();
       }
       try {
-        const origin = `http://${req.headers.host}`;
+        const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
         const tok = await httpsPost('oauth2.googleapis.com', '/token', {
           code,
           client_id: GOOGLE_CLIENT_ID,

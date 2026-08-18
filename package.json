@@ -1,0 +1,13 @@
+{
+  "name": "jupiter-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jupiter — The OS for AI Employees. Marketing site, signup API, and admin panel.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
