@@ -46,6 +46,11 @@
         <h3>Sign up</h3>
         <p class="fc-sub">Get access to the Jupiter platform and deploy your first AI employees.</p>
         <div class="form-err" id="form-err"></div>
+        <a class="g-btn" href="/auth/google">
+          <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.3h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.2-2.1 3.7-5.1 3.7-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-6-2.1-7-5.1L1.2 17.2C3.2 21.2 7.3 24 12 24z"/><path fill="#FBBC05" d="M5 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.2 6.8C.4 8.4 0 10.1 0 12s.4 3.6 1.2 5.2l3.8-2.9z"/><path fill="#EA4335" d="M12 4.6c2.3 0 3.8 1 4.7 1.8l3.4-3.3C18 1.2 15.2 0 12 0 7.3 0 3.2 2.8 1.2 6.8L5 9.7c1-3 3.8-5.1 7-5.1z"/></svg>
+          Sign up with Google
+        </a>
+        <div class="or-sep">or with email</div>
         <div class="form-grid2">
           <div class="field">
             <label for="f-name">Full name</label>
@@ -117,6 +122,13 @@
 
   const form = document.getElementById('signup-form');
   const errBox = document.getElementById('form-err');
+  if (params.get('google') === 'unconfigured') {
+    errBox.textContent = 'Google sign-in isn\'t set up yet — use the email form below for now.';
+    errBox.style.display = 'block';
+  } else if (params.get('google') === 'failed') {
+    errBox.textContent = 'Google sign-in didn\'t go through. Try again or use the email form.';
+    errBox.style.display = 'block';
+  }
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errBox.style.display = 'none';

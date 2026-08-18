@@ -2,6 +2,7 @@
 // Run: node Jupiter/server.js   (port 4960, no dependencies)
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -12,7 +13,48 @@ const PUBLIC = path.join(__dirname, 'public');
 const ADMIN_PASSWORD = process.env.JUPITER_ADMIN_PASSWORD || 'jupiter2026';
 const SESSION_TTL = 12 * 60 * 60 * 1000;
 
+// Google OAuth — set these (env vars or paste values) to enable "Sign up with Google".
+// In Google Cloud console add the redirect URI:  <your-origin>/auth/google/callback
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+
 const sessions = new Map();
+const oauthStates = new Map();
+
+function httpsPost(host, pathName, body) {
+  return new Promise((resolve, reject) => {
+    const data = new URLSearchParams(body).toString();
+    const req = https.request({
+      host, path: pathName, method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) }
+    }, r => {
+      let out = '';
+      r.on('data', c => out += c);
+      r.on('end', () => { try { resolve(JSON.parse(out)); } catch { reject(new Error('bad oauth response')); } });
+    });
+    req.on('error', reject);
+    req.end(data);
+  });
+}
+
+function httpsGet(host, pathName, bearer) {
+  return new Promise((resolve, reject) => {
+    https.get({ host, path: pathName, headers: { Authorization: 'Bearer ' + bearer } }, r => {
+      let out = '';
+      r.on('data', c => out += c);
+      r.on('end', () => { try { resolve(JSON.parse(out)); } catch { reject(new Error('bad userinfo response')); } });
+    }).on('error', reject);
+  });
+}
+
+function userCookie(id) {
+  return `jupiter_user=${id}; HttpOnly; Path=/; Max-Age=${30 * 86400}; SameSite=Lax`;
+}
+
+function currentUser(req) {
+  const id = getCookie(req, 'jupiter_user');
+  return id ? db.getUserById(id) : null;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -78,9 +120,74 @@ const server = http.createServer(async (req, res) => {
         email,
         company: String(body.company || '').trim().slice(0, 160),
         teamSize: String(body.teamSize || '').slice(0, 40),
-        plan: String(body.plan || '').slice(0, 40)
+        plan: String(body.plan || '').slice(0, 40),
+        source: 'form'
       });
-      return send(res, 200, { ok: true, id: user.id, existing });
+      return send(res, 200, { ok: true, id: user.id, existing }, { 'Set-Cookie': userCookie(user.id) });
+    }
+
+    if (p === '/api/me' && req.method === 'GET') {
+      const user = currentUser(req);
+      return send(res, 200, { user: user ? { name: user.name, email: user.email } : null });
+    }
+
+    if (p === '/api/logout-user' && req.method === 'POST')
+      return send(res, 200, { ok: true }, { 'Set-Cookie': 'jupiter_user=; Path=/; Max-Age=0' });
+
+    if (p === '/api/demo' && req.method === 'POST') {
+      const user = currentUser(req);
+      if (!user) return send(res, 401, { error: 'Sign up first to book a demo.' });
+      const { existing } = db.addDemoRequest({ userId: user.id, name: user.name, email: user.email });
+      return send(res, 200, { ok: true, existing });
+    }
+
+    // ---------- Google OAuth ----------
+    if (p === '/auth/google') {
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+        res.writeHead(302, { Location: '/signup.html?google=unconfigured' });
+        return res.end();
+      }
+      const state = crypto.randomBytes(16).toString('hex');
+      oauthStates.set(state, Date.now() + 10 * 60 * 1000);
+      const origin = `http://${req.headers.host}`;
+      const auth = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: origin + '/auth/google/callback',
+        response_type: 'code',
+        scope: 'openid email profile',
+        state
+      });
+      res.writeHead(302, { Location: 'https://accounts.google.com/o/oauth2/v2/auth?' + auth });
+      return res.end();
+    }
+
+    if (p === '/auth/google/callback') {
+      const state = url.searchParams.get('state');
+      const code = url.searchParams.get('code');
+      const exp = oauthStates.get(state);
+      oauthStates.delete(state);
+      if (!code || !exp || exp < Date.now()) {
+        res.writeHead(302, { Location: '/signup.html?google=failed' });
+        return res.end();
+      }
+      try {
+        const origin = `http://${req.headers.host}`;
+        const tok = await httpsPost('oauth2.googleapis.com', '/token', {
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: origin + '/auth/google/callback',
+          grant_type: 'authorization_code'
+        });
+        const info = await httpsGet('openidconnect.googleapis.com', '/v1/userinfo', tok.access_token);
+        if (!info.email) throw new Error('no email');
+        const { user } = db.addUser({ name: info.name || info.email.split('@')[0], email: info.email, source: 'google' });
+        res.writeHead(302, { Location: '/?signedup=1', 'Set-Cookie': userCookie(user.id) });
+        return res.end();
+      } catch {
+        res.writeHead(302, { Location: '/signup.html?google=failed' });
+        return res.end();
+      }
     }
 
     if (p === '/api/track' && req.method === 'POST') {
@@ -117,7 +224,7 @@ const server = http.createServer(async (req, res) => {
       if (!isAdmin(req)) return send(res, 401, { error: 'unauthorized' });
 
       if (p === '/api/admin/data' && req.method === 'GET')
-        return send(res, 200, { users: db.getUsers(), visits: db.getVisits() });
+        return send(res, 200, { users: db.getUsers(), visits: db.getVisits(), demoRequests: db.getDemoRequests() });
 
       if (p === '/api/admin/export.csv' && req.method === 'GET') {
         const rows = [['Name', 'Email', 'Company', 'Team size', 'Plan', 'Signed up']];
