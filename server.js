@@ -13,10 +13,14 @@ const PUBLIC = path.join(__dirname, 'public');
 const ADMIN_PASSWORD = process.env.JUPITER_ADMIN_PASSWORD || 'jupiter2026';
 const SESSION_TTL = 12 * 60 * 60 * 1000;
 
-// Google OAuth — set these (env vars or paste values) to enable "Sign up with Google".
+// Google OAuth — to enable "Sign up with Google", put your credentials in
+// Jupiter/google.json (gitignored):  { "client_id": "...", "client_secret": "..." }
+// or set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env vars.
 // In Google Cloud console add the redirect URI:  <your-origin>/auth/google/callback
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+let googleCfg = {};
+try { googleCfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'google.json'), 'utf8')); } catch {}
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || googleCfg.client_id || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || googleCfg.client_secret || '';
 
 const sessions = new Map();
 const oauthStates = new Map();
